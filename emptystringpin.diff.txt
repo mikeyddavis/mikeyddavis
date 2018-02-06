@@ -1,0 +1,114 @@
+diff -rup orig/src/argsparser.c new/src/argsparser.c
+--- orig/src/argsparser.c	2015-06-06 23:29:28.000000000 -0400
++++ new/src/argsparser.c	2015-06-19 19:43:00.035723311 -0400
+@@ -41,7 +41,7 @@ int process_arguments(int argc, char **a
+     int long_opt_index = 0;
+     char bssid[MAC_ADDR_LEN] = { 0 };
+     char mac[MAC_ADDR_LEN] = { 0 };
+-    char *short_options = "W:K:b:e:m:i:t:d:c:T:x:r:g:l:o:p:s:C:1:2:ZaA5ELfnqvDShwXNPH0";
++    char *short_options = "W:K:b:e:m:i:t:d:c:T:x:r:g:l:o:p:s:C:1:2:ZaA5ELfnqvDShwXNPH0B";
+     struct option long_options[] = {
+ 		{ "generate-pin", required_argument, NULL, 'W' },
+ 		{ "stop-in-m1", no_argument, NULL, '0' },
+@@ -80,8 +80,9 @@ int process_arguments(int argc, char **a
+         { "win7", no_argument, NULL, 'w' },
+         { "exhaustive", no_argument, NULL, 'X' },
+         { "help", no_argument, NULL, 'h' },
+-	{ "pixiedust-loop", no_argument, NULL, 'P' },
+-	{ "pixiedust-log", no_argument, NULL, 'H' },
++        { "pixiedust-loop", no_argument, NULL, 'P' },
++        { "pixiedust-log", no_argument, NULL, 'H' },
++        { "empty-string-pin", no_argument, NULL, 'B' },
+         { 0, 0, 0, 0 }
+     };
+ 
+@@ -215,12 +216,15 @@ int process_arguments(int argc, char **a
+             case 'N':
+                 set_oo_send_nack(0);
+                 break;
+-	    case 'P':
++	        case 'P':
+                 set_pixie_loop(1);
+                 break;
+-	    case 'H':
++            case 'H':
+                 set_pixie_log(1);
+                 break;
++	        case 'B':
++                set_empty_string_pin(1);
++                break;
+             default:
+                 ret_val = EXIT_FAILURE;
+         }
+@@ -256,6 +260,7 @@ void init_default_settings(void)
+ 	set_stop_in_m1(0);
+ 	set_op_gen_pin(0);
+     set_exhaustive(0);
++    set_empty_string_pin(0);
+ }
+ 
+ /* Parses the recurring delay optarg */
+Only in new/src: argsparser.c~
+diff -rup orig/src/globule.c new/src/globule.c
+--- orig/src/globule.c	2015-06-06 23:29:28.000000000 -0400
++++ new/src/globule.c	2015-06-19 19:25:30.875689503 -0400
+@@ -272,6 +272,16 @@ int get_pixie_log()
+     return globule->pixie_log;
+ }
+ 
++int get_empty_string_pin()
++{
++    return globule->empty_string_pin;
++}
++
++void set_empty_string_pin(int value)
++{
++    globule->empty_string_pin = value;
++}
++
+ void set_max_num_probes(int value)
+ {
+     globule->max_num_probes = value;
+diff -rup orig/src/globule.h new/src/globule.h
+--- orig/src/globule.h	2015-06-06 23:29:28.000000000 -0400
++++ new/src/globule.h	2015-06-19 19:24:23.091687318 -0400
+@@ -40,6 +40,9 @@ struct globals
+ {
+     int pixie_loop;                 /* Loops through up to M4 */
+     int pixie_log;                 /* Logs PixieDust hashes to executing directory */
++
++    int empty_string_pin;           /* Use an empty string as the pin */
++
+     int last_wps_state;             /* Holds the previous WPS state as stored in wps->state */
+ 
+     int p1_index;                   /* Index into p1 array for building WPS pins */
+@@ -262,6 +265,6 @@ int get_pixie_loop();
+ void set_pixie_log(int value);
+ int get_pixie_log();
+ void set_stop_in_m1(int index);
+-
++int get_empty_string_pin();
+ 
+ #endif
+diff -rup orig/src/pins.c new/src/pins.c
+--- orig/src/pins.c	2015-06-06 23:29:28.000000000 -0400
++++ new/src/pins.c	2015-06-19 19:36:54.419711529 -0400
+@@ -107,12 +107,17 @@ char *build_next_pin()
+     pin = build_wps_pin();
+     if(pin)
+     {
++        if (get_empty_string_pin())
++        {
++            wps_registrar_add_pin(wps->wps->registrar, NULL, "lalalalalala" , 0 , 0);
++        }
+         /* Add the new pin */
+-        if(wps_registrar_add_pin(wps->wps->registrar, NULL, (const u8 *) pin, PIN_SIZE, 0) != 0)
++        else if(wps_registrar_add_pin(wps->wps->registrar, NULL, (const u8 *) pin, PIN_SIZE , 0) != 0)
+         {
+             free(pin);
+             pin = NULL;
+         }
++
+     }
+ 
+     return pin;
